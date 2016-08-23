@@ -21,11 +21,21 @@ local TRACKED_HEAL = {
   SPELL_BUILDING_HEAL = true,
 }
 
+local TRACKED_DISPEL = {
+  SPELL_DISPEL = true,
+}
+
+
+local TRACKED_INTERRUPT = {
+  SPELL_INTERRUPT = true,
+}
 
 local TRACKED_SUMMONS = {
   SPELL_SUMMON = true,
   SPELL_CREATE = true,
 }
+
+
 
 local CLASS_COLORS = {
   DEATHKNIGHT = {r=0.77, g=0.12, b=0.23}, 
@@ -52,6 +62,9 @@ local SPELLS = "Spells"
 local FRIEND = "Friend Fire"
 local SOURCE = "Source"
 local HEAL = "Healing"
+local DISPEL = "Dispel"
+local INTERRUPT = "Interrupt"
+
 
 local REFRESH_FREQ = 1.0
 
@@ -71,12 +84,14 @@ local DETAILS_TARGET_TEXT = "KurecountDetailsHeaderFrameTargetText"
 
 
 --DATA TABLES
-local MAIN_FRAME_OPTIONS = {DAMAGE, TARGETS, FRIEND, HEAL}
+local MAIN_FRAME_OPTIONS = {DAMAGE, TARGETS, FRIEND, HEAL, DISPEL, INTERRUPT}
 local DETAILS_FRAME_OPTIONS = {
 [DAMAGE] = {SPELLS, TARGETS}, 
 [TARGETS] = {SOURCE},
 [FRIEND] = {TARGETS, SPELLS},
 [HEAL] = {TARGETS, SPELLS},
+[DISPEL] = {TARGETS},
+[INTERRUPT] = {TARGETS},
 }
 
 function Kurecount_OnLoad(self)
@@ -155,10 +170,15 @@ function Kurecount_TablesAssignments()
     kure_heal = kure_heal or {}
     kure_heal_spells = kure_heal_spells or {}
     kure_heal_targets = kure_heal_targets or {}
+	kure_dispel = kure_dispel or {}
+    kure_dispel_targets = kure_dispel_targets or {}
+	kure_interrupt = kure_interrupt or {}
+    kure_interrupt_targets = kure_interrupt_targets or {}
+	
 	
 
 
-	MAIN_DATA_TABLES = {[DAMAGE] = kure_party_damage, [TARGETS] = kure_target_damage, [FRIEND] = kure_friend_damage, [HEAL] = kure_heal}
+	MAIN_DATA_TABLES = {[DAMAGE] = kure_party_damage, [TARGETS] = kure_target_damage, [FRIEND] = kure_friend_damage, [HEAL] = kure_heal, [DISPEL] = kure_dispel, [INTERRUPT] = kure_interrupt}
 	DETAILS_DATA_TABLES = {
 		[DAMAGE] = {[SPELLS] = kure_party_spells, 
 					[TARGETS] = kure_party_targets}, 
@@ -167,9 +187,15 @@ function Kurecount_TablesAssignments()
 		
 		[FRIEND] = {[TARGETS] = kure_friend_targets, 
 					[SPELLS] = kure_friend_spells}, 
+					
 		[HEAL] = {[TARGETS] = kure_heal_targets, 
 					[SPELLS] = kure_heal_spells}, 
 					
+		[DISPEL] = {[TARGETS] = kure_dispel_targets, 
+					},
+					
+		[INTERRUPT] = {[TARGETS] = kure_interrupt_targets, 
+					},
 	}
 end
 
@@ -187,6 +213,10 @@ function Kurecount_ResetValues()
   kure_heal_targets = {}
   kure_player_info = {}
   kure_pet_info = {}
+  kure_dispel = {}
+  kure_dispel_targets = {}
+  kure_interrupt = {}
+  kure_interrupt_targets = {}
   Kurecount_TablesAssignments()
   
   kure_target = nil
@@ -414,13 +444,21 @@ function Kurecount_UpdateHealAmount(srcGUID, srcName, srcFlags, amount, overheal
   
   if kure_player_info[destGUID] and amount ~= overhealing then
 	-- healing
-	
 	Kurecount_UpdateMainTable(kure_heal, ownerGUID, amount-overhealing)
 	Kurecount_UpdateDetailsTable(kure_heal_targets, ownerGUID, srcName, destGUID, amount-overhealing)
 	Kurecount_UpdateDetailsTable(kure_heal_spells, ownerGUID, srcName, spellName, amount-overhealing)
   end
 end
 
+function Kurecount_UpdateInterrupt(srcGUID, srcName, srcFlags, destName, destFlags, spellName, extraSpellName)
+	Kurecount_UpdateMainTable(kure_interrupt, srcGUID, 1)
+	Kurecount_UpdateDetailsTable(kure_interrupt_targets, srcGUID, destName, extraSpellName, 1)
+end
+
+function Kurecount_UpdateDispel(srcGUID, srcName, srcFlags, destName, destFlags, spellName, extraSpellName)
+	Kurecount_UpdateMainTable(kure_dispel, srcGUID, 1)
+	Kurecount_UpdateDetailsTable(kure_dispel_targets, srcGUID, destName, extraSpellName, 1)
+end
 
 
 function Kurecount_UpdatePets()
@@ -476,16 +514,29 @@ function Kurecount_TrackCombatLog(timestamp, combatEvent, hideCaster, srcGUID, s
     if srcGUID == "" then
 		return
 	end
-	
-	
-	local offset = 4
 	local spellName = select(2, ...)
-    
-	local amount, overhealing, absorbed = select(offset, ...)
+    local amount, overhealing, absorbed = select(4, ...)
     Kurecount_UpdateHealAmount(srcGUID, srcName, srcFlags, amount, overhealing, absorbed, destGUID, destName, destFlags, spellName)
     
-	
+  elseif TRACKED_DISPEL[combatEvent] and kure_is_on_combat then
+    if srcGUID == "" then
+		return
+	end
+	local spellName = select(2, ...)
+    local extraSpellId, extraSpellName = select(4, ...)
+    Kurecount_UpdateDispel(srcGUID, srcName, srcFlags, destName, destFlags, spellName, extraSpellName)
+ 	
+  
+  elseif TRACKED_INTERRUPT[combatEvent] and kure_is_on_combat then
+    if srcGUID == "" then
+		return
+	end
+	local spellName = select(2, ...)
+    local extraSpellId, extraSpellName = select(4, ...)
+	Kurecount_UpdateInterrupt(srcGUID, srcName, srcFlags, destName, destFlags, spellName, extraSpellName)
+ 	
   end
+  
 end
 
 
@@ -634,7 +685,7 @@ function Kurecount_UpdateDetailsDamage(damageTable)
 					color = CLASS_COLORS[kure_player_info[v.id].classFilename]
 				end
 				
-				local textName = string.format("%d. %s (%d)", j, name, v.count)
+				local textName = string.format("%d. %s (%d)", i, name, v.count)
 				local textDamage = string.format("%s (%s)", ShortNum(v.value), percenttext)
 				Kurecount_FillRowFrame(DETAILS_ROW..rowIdx, v.id, textName, textDamage, color, percentRowLength)
 				rowIdx = rowIdx+1

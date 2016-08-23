@@ -1,7 +1,7 @@
 ## Interface: 30300
 ## Notes: Provides a DPS meter for your party
 
-## SavedVariablesPerCharacter:   kure_party_damage, kure_party_spells, kure_party_targets, kure_target_damage, kure_target_source, kure_friend_damage, kure_friend_targets, kure_friend_spells, kure_heal, kure_heal_spells, kure_heal_targets, kure_player_info, kure_pet_info, kure_target, kure_combat_start, kure_combat_end, kure_combat_time, kure_is_on_combat, kure_initialized
+## SavedVariablesPerCharacter:   kure_party_damage, kure_party_spells, kure_party_targets, kure_target_damage, kure_target_source, kure_friend_damage, kure_friend_targets, kure_friend_spells, kure_heal, kure_heal_spells, kure_heal_targets, kure_player_info, kure_pet_info, kure_target, kure_combat_start, kure_combat_end, kure_combat_time, kure_is_on_combat, kure_initialized, kure_dispel, kure_dispel_targets, kure_interrupt, kure_interrupt_targets
 
 Kurecount_tables.lua
 Kurecount.lua
